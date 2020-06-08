@@ -5,9 +5,10 @@ import { LeafletMouseEvent } from 'leaflet';
 import React, { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { FiArrowLeft } from 'react-icons/fi';
 import { Map, Marker, TileLayer } from 'react-leaflet';
-import { Link } from 'react-router-dom';
+import { Link, useHistory } from 'react-router-dom';
 
 import logo from '../../assets/logo.svg';
+import Dropzone from '../../components/Dropzone';
 import api from '../../services/api';
 
 interface Item {
@@ -40,6 +41,9 @@ const CreatePoint = () => {
   const [selectedCity, setSelectedCity] = useState('0');
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [selectedPosition, setSelectedPosition] = useState<[number, number]>([0, 0]);
+  const [selectedFile, setSelectedFile] = useState<File>();
+
+  const history = useHistory();
 
   useEffect(() => {
     api.get('items').then(response => {
@@ -64,10 +68,14 @@ const CreatePoint = () => {
   }, [selectedUfs])
 
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition(position => {
-      const { latitude, longitude } = position.coords;
-      setInitialPosition([latitude, longitude]);
-    })
+    async function loadPosition() {
+      navigator.geolocation.getCurrentPosition(position => {
+        console.log("latitude");
+        const { latitude, longitude } = position.coords;
+        setInitialPosition([latitude, longitude]);
+      })
+    }
+    loadPosition();
   }, [])
 
   function handleSelectUf(event: ChangeEvent<HTMLSelectElement>) {
@@ -108,20 +116,23 @@ const CreatePoint = () => {
     const [ latitude, longitude ] = selectedPosition;
     const items = selectedItems;
 
-    const data = {
-      name,
-      email,
-      whatsapp,
-      uf,
-      city,
-      latitude,
-      longitude,
-      items
-    }
+    const data = new FormData();
+    data.append('name', name);
+    data.append('email', email);
+    data.append('whatsapp', whatsapp);
+    data.append('uf', uf);
+    data.append('city', city);
+    data.append('latitude', String(latitude));
+    data.append('longitude', String(longitude));
+    data.append('items', items.join(', '));
+
+    if (selectedFile) data.append('image', selectedFile);
 
     await api.post('points', data)
 
-    alert("Sucesso garoto!")
+    alert("Sucesso garoto!");
+
+    history.push('/');
   }
 
   return(
@@ -136,6 +147,8 @@ const CreatePoint = () => {
 
       <form onSubmit={handleSubmit}>
         <h1>Cadastro do <br/> Ponto de coleta</h1>
+
+        <Dropzone onFileUploaded={setSelectedFile}/>
 
         <fieldset>
           <legend>
@@ -164,15 +177,13 @@ const CreatePoint = () => {
             <h2>Endereço</h2>
             <span>Selecione um endereço no mapa</span>
           </legend>
-
           <Map center={initialPosition} zoom={15} onClick={handleMapClick}>
             <TileLayer
               attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <Marker position={selectedPosition}/>
-          </Map>
-
+          </Map>  
           <div className="field-group">
             <div className="field">
               <label htmlFor="uf">Estado (UF)</label>
